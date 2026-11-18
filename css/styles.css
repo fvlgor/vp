@@ -1,0 +1,95 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.cli-font {
+    font-family: 'Fira Code', monospace !important;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--cli-bg, #050000);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--cli-text, #ff0000);
+    border-radius: 3px;
+}
+
+/* ==========================================================================
+   STRICT CLI MONOCHROMATIC & NEGATIVE-STATE THEME OVERRIDES
+   ========================================================================== */
+body.cli-mode, 
+body.cli-mode * {
+    background-color: var(--cli-bg, #050000) !important;
+    color: var(--cli-text, #ff0000) !important;
+    border-color: var(--cli-text, #ff0000) !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-radius: 2px !important;
+}
+
+/* Standard Interactive Elements in CLI Mode: Negative Fill (Solid Phosphor) */
+body.cli-mode button:not(.cli-tab-inactive):not(.cli-item-inactive),
+body.cli-mode select,
+body.cli-mode a.cli-btn {
+    background-color: var(--cli-text, #ff0000) !important;
+    color: var(--cli-bg, #050000) !important;
+    border: 1px solid var(--cli-text, #ff0000) !important;
+    font-weight: 700 !important;
+}
+
+body.cli-mode button:not(.cli-tab-inactive):not(.cli-item-inactive) *,
+body.cli-mode select *,
+body.cli-mode a.cli-btn * {
+    background-color: transparent !important;
+    color: var(--cli-bg, #050000) !important;
+    border-color: var(--cli-bg, #050000) !important;
+}
+
+/* Inactive Tabs & Unselected Items in CLI Mode: Hollow Background */
+body.cli-mode button.cli-tab-inactive,
+body.cli-mode .cli-item-inactive {
+    background-color: var(--cli-bg, #050000) !important;
+    color: var(--cli-text, #ff0000) !important;
+    border: 1px solid var(--cli-text, #ff0000) !important;
+    font-weight: 400 !important;
+    opacity: 0.85;
+}
+
+body.cli-mode button.cli-tab-inactive *,
+body.cli-mode .cli-item-inactive * {
+    background-color: transparent !important;
+    color: var(--cli-text, #ff0000) !important;
+}
+
+/* Active Sidebar Channel / P2P Item in CLI Mode: Inverted Negative Block */
+body.cli-mode .cli-item-active,
+body.cli-mode .cli-item-active * {
+    background-color: var(--cli-text, #ff0000) !important;
+    color: var(--cli-bg, #050000) !important;
+    border-color: var(--cli-text, #ff0000) !important;
+    font-weight: 700 !important;
+}
+
+/* Text Inputs & Checkboxes in CLI Mode */
+body.cli-mode input[type="text"],
+body.cli-mode input[type="password"] {
+    background-color: var(--cli-bg, #050000) !important;
+    color: var(--cli-text, #ff0000) !important;
+    border: 1px solid var(--cli-text, #ff0000) !important;
+}
+
+body.cli-mode input::placeholder {
+    color: var(--cli-text, #ff0000) !important;
+    opacity: 0.5 !important;
+}
+
+body.cli-mode input[type="checkbox"] {
+    accent-color: var(--cli-text, #ff0000) !important;
+    border: 1px solid var(--cli-text, #ff0000) !important;
+}

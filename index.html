@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoicePulse - Anonymity-First PTT & E2EE Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        accent: '#6366f1',
+                        accenthover: '#4f46e5'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body id="app-body" class="bg-darkbg text-slate-100 h-screen flex flex-col overflow-hidden transition-colors duration-300 cli-font cli-mode">
+
+    <!-- MANDATORY INITIAL LOGIN / AUTHENTICATION GATE -->
+    <div id="auth-gate" class="fixed inset-0 z-50 bg-darkbg flex flex-col items-center justify-center p-4">
+        <div class="bg-cardbg border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center border border-indigo-400/30">
+                        <i class="fa-solid fa-shield-halved text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-base tracking-tight">VoicePulse Vault</h1>
+                        <p class="text-[11px] opacity-75">Zero-Metadata E2EE Authentication Gate</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="window.VP.toggleThemeMode()" class="px-2.5 py-1.5 rounded text-[11px] font-bold border" title="Toggle CLI / Modern">
+                        <i class="fa-solid fa-sliders"></i>
+                    </button>
+                    <button type="button" onclick="window.VP.openCLIColorModal()" class="px-2.5 py-1.5 rounded text-[11px] font-bold border" title="CLI Phosphor Color">
+                        <i class="fa-solid fa-palette"></i>
+                    </button>
+                </div>
+            </div>
+
+            <form id="initial-login-form" onsubmit="window.VP.handleInitialAuthSubmit(event)" class="space-y-4">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs font-bold uppercase tracking-wider">Node Handle / Username</label>
+                        <button type="button" onclick="window.VP.fillRandomAuthHandle()" class="px-2 py-0.5 rounded text-[10px] font-mono border">
+                            <i class="fa-solid fa-dice mr-1"></i>Randomize
+                        </button>
+                    </div>
+                    <input type="text" id="gate-username" required placeholder="Enter handle..." autocomplete="off"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none font-mono">
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold uppercase tracking-wider block mb-1">Passphrase / Password</label>
+                    <input type="password" id="gate-password" required placeholder="Enter passphrase..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none font-mono">
+                    <p class="text-[10px] opacity-70 mt-1.5 font-mono">
+                        New handles are registered automatically with SHA-256 salted verification. Existing handles verify against stored hash.
+                    </p>
+                </div>
+
+                <div id="gate-error-msg" class="hidden text-xs p-2.5 border rounded font-mono"></div>
+
+                <button type="submit" id="gate-submit-btn" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-key"></i> Authenticate & Initialize E2EE Keys
+                </button>
+            </form>
+
+            <div class="border-t border-slate-800 pt-3 flex items-center justify-between text-[10px] opacity-75 font-mono">
+                <span>AES-GCM-256 Client-Side</span>
+                <span id="sync-mode-indicator">Checking Sync Node...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL & OVERLAY SYSTEM -->
+    <div id="modal-overlay" onclick="window.VP.handleOutsideModalClick(event)" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden backdrop-blur-sm">
+        <div id="modal-box" class="bg-cardbg border border-slate-700 rounded-2xl p-6 w-[480px] max-w-[92%] shadow-2xl transform transition-all">
+            <h3 id="modal-title" class="text-xl font-bold mb-2 text-slate-100">Notice</h3>
+            <p id="modal-desc" class="text-slate-300 text-xs mb-4">Description text here.</p>
+            <div id="modal-content" class="mb-6"></div>
+            <div id="modal-actions" class="flex justify-end gap-3">
+                <button id="modal-cancel" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-medium transition hidden text-slate-200 cli-tab-inactive">Cancel</button>
+                <button id="modal-confirm" class="px-4 py-2 bg-accent hover:bg-accenthover rounded-xl text-xs font-medium transition text-white">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOP NAVIGATION BAR -->
+    <header id="app-header" class="bg-cardbg border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0 transition-colors">
+        <div class="flex items-center space-x-3">
+            <button onclick="window.VP.toggleSidebarCollapse()" id="sidebar-toggle-btn" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 transition" title="Toggle Sidebar">
+                <i class="fa-solid fa-bars text-sm"></i>
+            </button>
+
+            <div id="header-logo-icon" class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center border border-indigo-400/30">
+                <i class="fa-solid fa-shield-halved text-white text-base"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight tracking-tight text-white flex items-center gap-2">
+                    VoicePulse <span id="header-badge" class="text-[10px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-normal">72h TTL</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Anonymity-First PTT & E2EE Ephemeral Vault</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap justify-end">
+            <button onclick="window.VP.toggleThemeMode()" id="theme-toggle-btn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="Switch Theme">
+                <i id="theme-icon" class="fa-solid fa-sliders"></i> <span id="theme-name">Modern Mode</span>
+            </button>
+
+            <button onclick="window.VP.openCLIColorModal()" id="colorwheel-btn" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-medium transition flex items-center" title="CLI Phosphor Customizer">
+                <i class="fa-solid fa-palette"></i>
+            </button>
+
+            <button onclick="window.VP.openDirectConnectModal()" id="p2p-btn-header" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-satellite-dish"></i> <span class="hidden md:inline">Direct P2P</span>
+            </button>
+
+            <button onclick="window.VP.openSwitchUserModal()" id="switch-user-btn-header" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-user-lock"></i> <span class="hidden md:inline">Switch User</span>
+            </button>
+
+            <button onclick="window.VP.openAdminDashboard()" id="admin-console-btn" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition items-center gap-1.5">
+                <i class="fa-solid fa-screwdriver-wrench"></i> <span class="hidden md:inline">Console</span>
+            </button>
+
+            <div id="user-badge-box" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-xl">
+                <div class="w-6 h-6 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-user-secret"></i>
+                </div>
+                <div class="text-left">
+                    <div id="user-name-display" class="text-xs font-semibold text-slate-200 font-mono leading-tight">Locked</div>
+                    <div class="text-[9px] text-emerald-400 flex items-center gap-1 leading-tight">ONLINE</div>
+                </div>
+            </div>
+            
+            <button onclick="window.VP.leaveRoom()" id="leave-room-btn" class="hidden px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-medium transition items-center gap-1">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Left Collapsible Sidebar -->
+        <aside id="app-sidebar" class="w-72 bg-slate-900/60 border-r border-slate-800 flex flex-col shrink-0 transition-all duration-200 overflow-hidden">
+            <div id="sidebar-header-box" class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+                <h2 id="sidebar-title-text" class="font-semibold text-xs text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-network-wired"></i> Channels & P2P
+                </h2>
+                <div id="create-room-btn" class="flex items-center gap-1.5">
+                    <button onclick="window.VP.openJoinChannelByNameModal()" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center transition" title="Join Channel by Name">
+                        <i class="fa-solid fa-right-to-bracket text-xs"></i>
+                    </button>
+                    <button onclick="window.VP.openCreateRoomModal()" class="w-7 h-7 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition" title="Create Channel">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Collapsed Sidebar Join & Create Channel Buttons -->
+            <div id="collapsed-create-box" class="p-2 hidden flex-col items-center gap-1.5 border-b border-slate-800">
+                <button onclick="window.VP.openJoinChannelByNameModal()" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center transition" title="Join Channel by Name">
+                    <i class="fa-solid fa-right-to-bracket text-xs"></i>
+                </button>
+                <button onclick="window.VP.openCreateRoomModal()" class="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition" title="Create Channel">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                </button>
+            </div>
+
+            <div id="rooms-list" class="flex-1 overflow-y-auto p-2.5 space-y-2"></div>
+        </aside>
+
+        <!-- Right Main Room & Chat Container -->
+        <main id="room-workspace" class="flex-1 flex flex-col bg-darkbg relative overflow-hidden">
+
+            <div id="workspace-header" class="bg-cardbg/80 border-b border-slate-800 px-5 py-3 flex items-center justify-between z-10 shrink-0">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div id="room-icon" class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-base shrink-0">
+                        <i class="fa-solid fa-globe"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h2 id="current-room-title" class="font-bold text-sm text-slate-100 truncate">Public Channel</h2>
+                            <button id="add-p2p-user-btn" onclick="window.VP.openAddUserToP2PModal()" class="hidden px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded hover:bg-indigo-500 transition shrink-0" title="Invite Another Peer to This P2P Channel">
+                                <i class="fa-solid fa-user-plus mr-1"></i> + Add User
+                            </button>
+                            <button id="close-p2p-channel-btn" onclick="window.VP.closeActiveP2PChannel()" class="hidden px-2 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded hover:bg-rose-500 transition shrink-0" title="Exit P2P Channel & Block Peer">
+                                <i class="fa-solid fa-xmark mr-1"></i> End P2P
+                            </button>
+                        </div>
+                        <p id="current-room-desc" class="text-[11px] text-slate-400 truncate">Anonymized feed ("ANON"). Auto-deletes after 72h.</p>
+                    </div>
+                </div>
+
+                <!-- Mutually Exclusive Tab Buttons -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="window.VP.switchTab('feed')" id="tab-btn-feed" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                        <i class="fa-solid fa-comments mr-1"></i> Feed <span id="chat-badge" class="ml-1 px-1.5 py-0.2 rounded text-[10px]" style="display:none;">0</span>
+                    </button>
+                    <button onclick="window.VP.switchTab('users')" id="tab-btn-users" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cli-tab-inactive">
+                        <i class="fa-solid fa-users mr-1"></i> Users (<span id="online-count">1</span>)
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 relative overflow-hidden flex">
+
+                <!-- TAB 1: EPHEMERAL CHAT & VOICE CLIP FEED -->
+                <div id="tab-content-feed" class="absolute inset-0 flex flex-col bg-darkbg">
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+
+                    <div id="chat-footer-bar" class="p-3.5 bg-cardbg border-t border-slate-800 shrink-0">
+                        <div class="flex items-center justify-between mb-2 text-xs text-slate-400 flex-wrap gap-2">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label class="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                                    <i class="fa-regular fa-clock"></i> Expiry TTL:
+                                    <select id="msg-ttl-select" class="bg-slate-900 border border-slate-700 text-slate-200 rounded px-2 py-0.5 text-[11px] focus:outline-none">
+                                        <option value="1">1 Hour</option>
+                                        <option value="6">6 Hours</option>
+                                        <option value="24">24 Hours</option>
+                                        <option value="48">48 Hours</option>
+                                        <option value="72" selected>72 Hours (Default)</option>
+                                    </select>
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                                    <input type="checkbox" id="msg-burn-read" class="rounded bg-slate-900 border-slate-700">
+                                    <span>Autoburn (120s after read/play)</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                                    <input type="checkbox" id="audio-beeps-toggle" checked class="rounded bg-slate-900 border-slate-700">
+                                    <span>Audio Beeps</span>
+                                </label>
+                            </div>
+                            <span id="ptt-live-indicator" class="text-[10px] text-slate-500 font-mono">AES-GCM-256 E2EE</span>
+                        </div>
+
+                        <form id="chat-form" onsubmit="window.VP.sendChatMessage(event)" class="flex items-center gap-2">
+                            <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="window.VP.handleFileAttachment(event, 'image')">
+                            <input type="file" id="general-file-input" class="hidden" onchange="window.VP.handleFileAttachment(event, 'file')">
+
+                            <button type="button" onclick="document.getElementById('image-file-input').click()" class="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-xl transition" title="Attach Image">
+                                <i class="fa-regular fa-image text-xs"></i>
+                            </button>
+                            <button type="button" onclick="document.getElementById('general-file-input').click()" class="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-xl transition" title="Attach File">
+                                <i class="fa-solid fa-paperclip text-xs"></i>
+                            </button>
+
+                            <input type="text" id="chat-input" placeholder="Transmit encrypted message..." autocomplete="off"
+                                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition">
+
+                            <!-- PTT Button Next to Send Button -->
+                            <button type="button" id="ptt-button" 
+                                class="hidden px-3.5 py-2 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold rounded-xl text-xs transition items-center gap-1.5 select-none cursor-pointer shrink-0"
+                                title="Hold to Talk or Press Spacebar (Private & P2P Channels Only)">
+                                <i id="ptt-mic-icon" class="fa-solid fa-walkie-talkie text-xs"></i>
+                                <span id="ptt-btn-text">HOLD PTT</span>
+                            </button>
+
+                            <button type="submit" id="send-msg-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium text-xs transition flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-paper-plane"></i> Send
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 2: CONNECTED USERS LIST -->
+                <div id="tab-content-users" class="absolute inset-0 flex flex-col hidden p-5 overflow-y-auto bg-darkbg">
+                    <div class="max-w-2xl w-full mx-auto">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-sm text-slate-200">Channel Roster & Directory Policy</h3>
+                            <span class="text-[10px] border border-slate-700 px-2 py-0.5 rounded font-mono">Zero-Discovery Mode</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-5">User identities are hidden in public/passwordless channels. To establish a direct connection, manually enter the exact username via Direct P2P.</p>
+                        <div id="users-list-container" class="space-y-2.5"></div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modular ES6 Application Entry -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
